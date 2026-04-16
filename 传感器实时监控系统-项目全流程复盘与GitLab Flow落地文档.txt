@@ -1,0 +1,453 @@
+## 任务 1：项目全流程复盘
+
+
+### 第一步：项目初始化 - 搭建基础前后端框架
+
+__目标__：创建项目基础结构，建立前后端通信框架
+
+__修改的文件__：
+
+- `index.html` - 创建基础 HTML 结构
+- `sensor_server.py` - 创建 Python HTTP 服务器
+
+__核心功能实现__：
+
+```python
+# sensor_server.py 基础框架
+import http.server
+import socketserver
+import json
+
+PORT = 8080
+
+class SensorHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/api/sensor':
+            self.send_sensor_data()
+    
+    def send_sensor_data(self):
+        data = {"acceleration": {"x": 0, "y": 0, "z": 1}}
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(data).encode())
+
+socketserver.TCPServer.allow_reuse_address = True
+with socketserver.TCPServer(("", PORT), SensorHandler) as httpd:
+    httpd.serve_forever()
+```
+
+
+### 第二步：实现传感器数据实时展示
+
+__目标__：完成加速度、角速度、欧拉角数值卡片显示
+
+__修改的文件__：
+
+- `index.html` - 添加数据卡片 HTML 结构和 CSS 样式
+
+__核心功能实现__：
+
+```html
+<!-- 数据卡片结构 -->
+<div class="data-grid">
+    <div class="data-card">
+        <h3>加速度 (g)</h3>
+        <div class="data-row">
+            <span class="data-label">X 轴</span>
+            <span class="data-value acc"><span id="accX">0.0000</span></span>
+        </div>
+        <!-- Y 轴、Z 轴类似 -->
+    </div>
+    <!-- 角速度、欧拉角卡片类似 -->
+</div>
+```
+
+// 数据更新函数
+function updateValues(data) {
+    document.getElementById('accX').textContent = data.acceleration.x.toFixed(4);
+    document.getElementById('accY').textContent = data.acceleration.y.toFixed(4);
+    document.getElementById('accZ').textContent = data.acceleration.z.toFixed(4);
+    document.getElementById('gyroX').textContent = data.angular_velocity.x.toFixed(2);
+    document.getElementById('roll').textContent = data.euler_angle.roll.toFixed(2);
+    // ...
+}
+
+// 定时获取数据
+setInterval(fetchSensorData, 100); // 10Hz
+
+
+### 第三步：开发波形图模块
+
+__目标__：实现多色曲线、坐标轴、鼠标悬浮交互的实时波形图
+
+__修改的文件__：
+
+- `index.html` - 添加 ECharts 图表容器和配置
+
+__核心功能实现__：
+
+```javascript
+// 加速度波形图配置
+accChart = echarts.init(document.getElementById('accChart'));
+const accOption = {
+    tooltip: {
+        trigger: 'axis',
+        formatter: function(params) {
+            // 鼠标悬浮显示详细数据
+        }
+    },
+    legend: { data: ['X 轴', 'Y 轴', 'Z 轴'] },
+    xAxis: { type: 'category', data: [] },
+    yAxis: { type: 'value', min: -0.6, max: 1.2 },
+    series: [
+        { name: 'X 轴', lineStyle: { color: '#ff4d4d' }, areaStyle: {...} },
+        { name: 'Y 轴', lineStyle: { color: '#66bb6a' }, areaStyle: {...} },
+        { name: 'Z 轴', lineStyle: { color: '#ffcc00' }, areaStyle: {...} }
+    ]
+};
+
+// 实时更新图表
+function updateCharts(data) {
+    sensorData.acceleration.x.push(data.acceleration.x);
+    // ...保持数据点在 maxDataPoints 范围内
+    accChart.setOption({
+        xAxis: { data: sensorData.timestamps },
+        series: [{ data: sensorData.acceleration.x }, ...]
+    });
+}
+```
+
+
+### 第四步：实现 3D 设备姿态和 2D 姿态仪表盘
+
+__目标__：完成 Three.js 立方体渲染和 Canvas 仪表盘显示
+
+__修改的文件__：
+
+- `index.html` - 添加 3D 容器、Canvas 元素和 Three.js 初始化代码
+
+__核心功能实现__：
+
+```javascript
+// 3D 初始化
+function initAttitude3D() {
+    threeScene = new THREE.Scene();
+    threeCamera = new THREE.PerspectiveCamera(45, width/height, 0.1, 1000);
+    threeRenderer = new THREE.WebGLRenderer({ antialias: true });
+    
+    // 创建设备立方体
+    const geometry = new THREE.BoxGeometry(3, 2, 4);
+    const material = new THREE.MeshLambertMaterial({ 
+        color: 0x6bb6ff, transparent: true, opacity: 0.6 
+    });
+    deviceCube = new THREE.Mesh(geometry, material);
+    
+    // 添加坐标轴
+    const xLine = new THREE.Line(...); // X 轴红色
+    const yLine = new THREE.Line(...); // Y 轴绿色
+    const zLine = new THREE.Line(...); // Z 轴蓝色
+    
+    threeScene.add(deviceGroup);
+}
+
+// 3D 渲染循环
+function animate3D() {
+    requestAnimationFrame(render);
+    deviceCube.rotation.x = degreesToRadians(currentPitch);
+    deviceCube.rotation.y = degreesToRadians(currentYaw);
+    deviceCube.rotation.z = degreesToRadians(currentRoll);
+    threeRenderer.render(threeScene, threeCamera);
+}
+
+// 2D 仪表盘绘制
+function drawAttitudeGauge(tiltAngle, direction, roll, pitch) {
+    // 绘制圆形仪表盘、指针、方向标签
+}
+```
+
+
+### 第五步：开发姿态判断模块
+
+__目标__：实现姿态识别、运动状态检测、数据导出功能
+
+__修改的文件__：
+
+- `index.html` - 添加姿态判断逻辑和导出按钮
+
+__核心功能实现__：
+
+```javascript
+// 姿态检测
+function detectPose(data) {
+    const roll = data.euler_angle.roll;
+    const pitch = data.euler_angle.pitch;
+    
+    if (pitch > 80 || data.acceleration.z < -0.5) return '倒置';
+    if (roll < -11) return '左倾';
+    if (roll > 11) return '右倾';
+    if (pitch < -11) return '前倾';
+    if (pitch > 11) return '后倾';
+    return '平放';
+}
+
+// 运动状态检测（基于加速度标准差）
+function detectMotion(data) {
+    poseState.accHistory.push({x, y, z});
+    const motionStd = Math.max(
+        calculateStd(xValues),
+        calculateStd(yValues),
+        calculateStd(zValues)
+    );
+    if (motionStd > 0.3) return '剧烈运动';
+    if (motionStd >= 0.08) return '正常移动';
+    return '静止';
+}
+
+// 数据导出
+function exportDatasetAsCsv() {
+    const header = 'timestamp,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,roll,pitch,yaw,posture,status';
+    const rows = exportDataState.historyRecords.map(record => [...].join(','));
+    downloadFile([header].concat(rows).join('\n'), 'sensor_dataset_' + Date.now() + '.csv');
+}
+```
+
+
+### 第六步：全流程联调
+
+__目标__：修复布局、颜色、数据逻辑问题，完成项目
+
+__修改的文件__：
+
+- `index.html` - 调整 CSS 样式、修复 JS 逻辑
+- `sensor_server.py` - 完善数据模拟逻辑
+
+__核心功能实现__：
+
+```python
+# 传感器数据模拟器
+class SensorDataSimulator:
+    def __init__(self):
+        self.poses = [
+            {'name': '平放', 'roll': 0, 'pitch': 0, 'acc_z': 1.0},
+            {'name': '左倾', 'roll': -25, 'pitch': 0, 'acc_z': 0.9},
+            {'name': '右倾', 'roll': 25, 'pitch': 0, 'acc_z': 0.9},
+            {'name': '前倾', 'roll': 0, 'pitch': -25, 'acc_z': 0.9},
+            {'name': '后倾', 'roll': 0, 'pitch': 25, 'acc_z': 0.9},
+            {'name': '倒置', 'roll': 0, 'pitch': 0, 'acc_z': -1.0}
+        ]
+    
+    def get_data(self):
+        # 基于时间生成模拟传感器数据
+        roll = pose_target['roll'] + 2 * math.sin(elapsed_time * 3)
+        pitch = pose_target['pitch'] + 2 * math.cos(elapsed_time * 2.5)
+        # ...
+```
+
+
+## 任务 2：GitLab Flow 流程落地
+
+### 完整 Git 操作命令（可直接复制执行）
+
+```bash
+# 1. 切换到项目目录
+cd SensorMonitor
+
+# 2. 初始化 Git 仓库（如果尚未初始化）
+git init
+
+# 3. 配置 Git 用户信息（首次使用需要）
+git config user.name "Your Name"
+git config user.email "your.email@example.com"
+
+# 4. 关联 GitHub 仓库
+git remote add origin https://github.com/csm-1-msc/csm3.git
+
+# 5. 添加所有文件
+git add .
+
+# 6. 提交到本地仓库
+git commit -m "feat: 完成传感器实时监控系统 v1.0 开发"
+
+# 7. 重命名分支为 main（如果默认是 master）
+git branch -m master main
+
+# 8. 推送 main 分支到远程
+git push -u origin main
+
+# 9. 创建 staging 分支（测试环境）
+git checkout -b staging
+git push -u origin staging
+
+# 10. 创建 production 分支（生产环境）
+git checkout -b production
+git push -u origin production
+
+# 11. 切回 main 分支，准备后续开发
+git checkout main
+```
+
+
+### 后续开发分支流程
+
+```bash
+# 从 main 创建新功能分支
+git checkout main
+git pull origin main
+git checkout -b feature/new-feature
+
+# 开发完成后提交
+git add .
+git commit -m "feat: 添加新功能"
+
+# 合并到 staging（测试）
+git checkout staging
+git merge feature/new-feature
+git push origin staging
+
+# 测试通过后合并到 production（发布）
+git checkout production
+git merge staging
+git push origin production
+
+# 清理已合并的功能分支
+git checkout main
+git branch -d feature/new-feature
+```
+
+
+任务 3：更新后的 README.md
+
+# 传感器实时监控系统
+
+基于 Python 内置库 + 纯 H5/CSS/JS 实现的传感器实时监控界面，支持 3D 姿态显示和 2D 仪表盘。
+
+## 技术栈
+
+- **后端**: Python 内置库（http.server, socketserver），无任何 Web 框架依赖
+- **前端**: 纯 HTML5 + CSS3 + JavaScript
+- **3D 渲染**: Three.js 最小可用版（本地）
+- **图表**: ECharts 简化离线版（本地）
+- **数据更新频率**: 10Hz
+
+## 文件结构
+
+SensorMonitor/ ├── index.html # 前端页面（含 3D/2D 姿态模块、波形图、姿态判断） ├── echarts.min.js # ECharts 离线版 ├── three.min.js # Three.js 最小版 ├── sensor_server.py # Python 数据服务器（模拟传感器数据） ├── run_server.bat # Windows 快速启动脚本 └── README.md # 项目说明文档
+
+
+
+## 运行方法
+
+### 方法 1：使用批处理脚本（推荐）
+
+双击 `run_server.bat` 文件即可启动服务器。
+
+### 方法 2：命令行启动
+
+```bash
+cd SensorMonitor
+python sensor_server.py
+访问系统
+打开浏览器访问：http://localhost:8080
+
+停止服务器
+按 Ctrl+C 停止 Python 服务器
+
+功能模块
+1. 实时数据显示
+加速度（X/Y/Z 轴，单位：g）
+角速度（X/Y/Z 轴，单位：°/s）
+欧拉角（Roll/Pitch/Yaw，单位：°）
+2. 实时波形图
+加速度波形图（三轴彩色曲线）
+角速度波形图（三轴彩色曲线）
+欧拉角波形图（Roll/Pitch/Yaw）
+鼠标悬浮显示详细数值
+3. 3D 设备姿态
+实时 3D 立方体显示
+根据 Roll/Pitch/Yaw 同步旋转
+显示 X/Y/Z 坐标轴及标签
+4. 2D 姿态仪表盘
+圆形仪表盘显示倾斜角度
+指针长度随倾斜角度变化
+倾斜方向指示（平放/左倾/右倾/前倾/后倾）
+5. 姿态判断（Pose Detection）
+当前姿态识别：平放、左倾、右倾、前倾、后倾、倒置
+运动状态判定：静止、正常移动、剧烈运动
+姿态保持时间计时（HH:MM:SS）
+6. 数据导出
+导出当前帧 JSON
+导出机器学习数据集 CSV（自动维护最近 500 条记录）
+姿态判定规则
+姿态	判定条件
+平放	|Roll| < 10° 且 |Pitch| < 10°
+左倾	Roll < -11°
+右倾	Roll > 11°
+前倾	Pitch < -11°
+后倾	Pitch > 11°
+倒置	Pitch > 80° 或 Z 轴加速度 < -0.5g
+运动状态判定
+基于最近 10 帧加速度三轴数据的标准差：
+
+静止: 标准差 < 0.08g
+正常移动: 标准差 0.08g ~ 0.3g
+剧烈运动: 标准差 > 0.3g
+防抖机制
+姿态防抖: 5 帧滑动窗口，连续 4 帧一致才更新显示
+状态防抖: 3 帧滑动窗口，连续 3 帧一致才更新显示
+滞回区间: 10°阈值附近设置 1°滞回区（9°~11°），避免频繁跳变
+API 接口
+接口	说明	响应示例
+GET /api/sensor	获取传感器数据	{"acceleration": {"x": 0.0, "y": 0.0, "z": 1.0}, "angular_velocity": {...}, "euler_angle": {...}}
+GET /api/status	获取服务器状态	{"status": "running", "port": 8080, "update_rate": "10Hz"}
+GET /	访问前端界面	HTML 页面
+GitLab Flow 分支管理
+本项目采用 GitLab Flow 分支管理策略：
+
+分支结构
+main: 主开发分支，包含最新代码
+staging: 测试环境分支，用于功能测试
+production: 生产环境分支，用于正式发布
+开发流程
+从 main 创建 feature/xxx 功能分支
+功能开发完成后合并到 staging 进行测试
+测试通过后合并到 production 发布
+发布后合并回 main 保持同步
+注意事项
+确保 Python 3.x 环境已安装
+服务器默认占用 8080 端口
+数据源为模拟数据，可修改 sensor_server.py 中的 SensorDataSimulator 类
+系统全程离线运行，无需联网
+echarts.min.js 和 three.min.js 为离线版本，无需网络依赖
+自定义数据源
+如需连接真实传感器，修改 sensor_server.py 中的 get_data() 方法：
+
+
+def get_data(self):
+    # 替换为真实传感器数据读取逻辑
+    # 例如：通过串口、网络 Socket、HTTP 请求等方式获取
+    return {
+        "acceleration": {"x": 0.0, "y": 0.0, "z": 1.0},
+        "angular_velocity": {"x": 0.0, "y": 0.0, "z": 0.0},
+        "euler_angle": {"roll": 0.0, "pitch": 0.0, "yaw": 0.0},
+        "timestamp": datetime.now().isoformat()
+    }
+  
+版本历史
+v1.0 (2026-04-16): 初始版本，完成所有核心功能
+实时数据显示
+波形图模块
+3D/2D 姿态显示
+姿态判断与运动状态检测
+数据导出功能
+
+
+---
+
+## 总结
+
+本项目从 0 到 1 的开发共分为 6 个步骤，每个步骤都有明确的目标和核心功能实现。项目采用纯前后端分离架构，无任何重型框架依赖，完全基于 Python 内置库和原生 JavaScript 实现。
+
+GitLab Flow 分支管理策略确保了代码的稳定性和发布的可控性，适合持续集成和持续部署（CI/CD）流程。
+
+---

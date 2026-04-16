@@ -4,7 +4,7 @@
 
 ## 技术栈
 
-- **后端**: Python 内置库（http.server, socketserver），无任何 Web 框架
+- **后端**: Python 内置库（http.server, socketserver），无任何 Web 框架依赖
 - **前端**: 纯 HTML5 + CSS3 + JavaScript
 - **3D 渲染**: Three.js 最小可用版（本地）
 - **图表**: ECharts 简化离线版（本地）
@@ -14,117 +14,98 @@
 
 ```
 SensorMonitor/
-├── index.html          # 前端界面（含 3D/2D 姿态模块）
+├── index.html          # 前端页面（含 3D/2D 姿态模块、波形图、姿态判断）
 ├── echarts.min.js      # ECharts 离线版
 ├── three.min.js        # Three.js 最小版
-├── sensor_server.py    # Python 数据服务器
-└── README.md           # 项目说明
+├── sensor_server.py    # Python 数据服务器（模拟传感器数据）
+├── run_server.bat      # Windows 快速启动脚本
+└── README.md           # 项目说明文档
 ```
 
 ## 运行方法
 
-### 步骤 1：启动 Python 服务器
+### 方法 1：使用批处理脚本（推荐）
 
-在项目目录打开命令行，执行：
+双击 `run_server.bat` 文件即可启动服务器。
+
+### 方法 2：命令行启动
 
 ```bash
 cd SensorMonitor
 python sensor_server.py
 ```
 
-或使用批处理脚本（如果已创建）：
+### 访问系统
 
-```bash
-run_server.bat
-```
+打开浏览器访问：http://localhost:8080
 
-### 步骤 2：打开浏览器
-
-访问：http://localhost:8080
-
-### 步骤 3：停止服务器
+### 停止服务器
 
 按 `Ctrl+C` 停止 Python 服务器
 
 ## 功能模块
 
 ### 1. 实时数据显示
-- 加速度（X/Y/Z 轴）
-- 角速度（X/Y/Z 轴）
-- 欧拉角（Roll/Pitch/Yaw）
+- 加速度（X/Y/Z 轴，单位：g）
+- 角速度（X/Y/Z 轴，单位：°/s）
+- 欧拉角（Roll/Pitch/Yaw，单位：°）
 
-### 2. 3D 设备姿态
-- 实时 3D 立方体显示
-- 根据 Roll/Pitch/Yaw 同步旋转
-- 显示 X/Y/Z 坐标轴
+### 2. 实时波形图
+- 加速度波形图（三轴彩色曲线）
+- 角速度波形图（三轴彩色曲线）
 
-### 3. 2D 姿态仪表盘
-- 圆形仪表盘显示倾斜角度
-- 倾斜方向指示（平放/左倾/右倾/前倾/后倾）
+### 3. 3D 姿态显示
+- 实时 3D 立方体姿态模拟
+- 基于欧拉角旋转
 
-### 4. 实时波形图
-- 加速度波形图
-- 角速度波形图
-- 欧拉角波形图
+### 4. 2D 仪表盘
+- 水平仪（Roll）
+- 俯仰仪（Pitch）
 
 ### 5. 姿态判断
-- 当前姿态识别（平放/左倾/右倾/前倾/后倾/倒置）
-- 运动状态判定（静止/正常移动/剧烈运动）
-- 姿态保持时间计时（HH:MM:SS）
+- 正常、翻转、侧翻、俯仰等状态检测
 
-### 6. 数据导出
-- 导出当前帧 JSON
-- 导出机器学习数据集 CSV（最近 500 条记录）
+## GitLab Flow 分支管理
 
-## 姿态判定规则
+本项目采用 GitLab Flow 分支管理策略：
 
-| 姿态 | 判定条件 |
-|------|----------|
-| 平放 | \|Roll\| < 10° 且 \|Pitch\| < 10° |
-| 左倾 | Roll < -10° |
-| 右倾 | Roll > 10° |
-| 前倾 | Pitch < -10° |
-| 后倾 | Pitch > 10° |
-| 倒置 | Pitch > 80° 或 Z 轴加速度 < -0.5g |
+### 分支说明
 
-## 运动状态判定
+| 分支名 | 说明 | 保护状态 |
+|--------|------|----------|
+| `main` | 开发分支，日常开发工作 | 否 |
+| `staging` | 预发布分支，测试环境部署 | 是 |
+| `production` | 生产分支，正式环境部署 | 是 |
 
-基于最近 10 帧加速度三轴数据的标准差：
-- **静止**: 标准差 < 0.05g
-- **正常移动**: 标准差 0.05g ~ 0.2g
-- **剧烈运动**: 标准差 > 0.2g
+### 工作流程
 
-## 防抖机制
+```
+feature 分支 (开发) → main 分支 (开发) → staging 分支 (测试) → production 分支 (生产)
+```
 
-- **姿态防抖**: 5 帧滑动窗口，连续 5 帧一致才更新显示
-- **状态防抖**: 3 帧滑动窗口，连续 3 帧一致才更新显示
-- **滞回区间**: 10°阈值附近设置 1°滞回区（9°~11°），避免频繁跳变
+1. **开发阶段**: 在 `main` 分支上进行日常开发
+2. **测试阶段**: 代码稳定后合并到 `staging` 分支进行测试
+3. **发布阶段**: 测试通过后合并到 `production` 分支发布
 
-## API 接口
+### 分支保护规则
 
-| 接口 | 说明 |
-|------|------|
-| GET /api/sensor | 获取传感器数据（JSON） |
-| GET /api/status | 获取服务器状态 |
-| GET / | 访问前端界面 |
+- `staging` 分支：仅允许从 `main` 分支合并，需要代码审查
+- `production` 分支：仅允许从 `staging` 分支合并，需要审批
 
-## 注意事项
+## 开发说明
 
-1. 确保 Python 环境已安装（Python 3.x）
-2. 服务器启动后，8080 端口将被占用
-3. 数据源为模拟数据，可根据需要修改 `sensor_server.py` 中的 `SensorDataSimulator` 类
-4. 全程离线运行，无需联网
+### 添加新传感器数据
 
-## 自定义数据源
+在 `sensor_server.py` 中添加新的数据字段，并在 `index.html` 中对应的显示模块添加展示逻辑。
 
-如需连接真实传感器，修改 `sensor_server.py` 中的 `get_data()` 方法：
+### 修改波形图
 
-```python
-def get_data(self):
-    # 替换为真实传感器数据读取逻辑
-    return {
-        "acceleration": {"x": 0.0, "y": 0.0, "z": 1.0},
-        "angular_velocity": {"x": 0.0, "y": 0.0, "z": 0.0},
-        "euler_angle": {"roll": 0.0, "pitch": 0.0, "yaw": 0.0},
-        "timestamp": datetime.now().isoformat()
-    }
+波形图配置在 `index.html` 中的 `initWaveformCharts()` 函数内，可修改颜色、范围等参数。
+
+### 修改 3D 模型
+
+3D 模型在 `init3DModel()` 函数中创建，可替换为更复杂的模型。
+
+## 许可证
+
+本项目仅供学习使用。
